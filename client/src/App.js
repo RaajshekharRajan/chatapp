@@ -3,10 +3,8 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import './App.css';
 
-// ====================================================================================
-// IMPORTANT: Replace this with the URL of your deployed backend Web Service on Render
-const SERVER_URL = 'https://chatapp-mbgw.onrender.com';
-// ====================================================================================
+const SERVER_URL = 'https://your-backend-url.onrender.com';
+
 
 const socket = io(SERVER_URL);
 
@@ -20,15 +18,20 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   
-  // New state for user list and selection
+  // State for user list and selection
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // --- NEW: State for semantic search ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
 
   // Effect to handle incoming messages in real-time
   useEffect(() => {
     socket.on('receiveMessage', (message) => {
-      // Add message to state only if it's part of the selected conversation
-      if (selectedUser && (message.senderId === selectedUser._id || message.senderId === user._id)) {
+      if (selectedUser && (message.senderId === selectedUser._id || message.receiverId === selectedUser._id)) {
         setMessages((prevMessages) => [...prevMessages, message]);
       }
     });
@@ -47,10 +50,8 @@ function App() {
       const loggedInUser = response.data;
       setUser(loggedInUser);
       localStorage.setItem('user', JSON.stringify(loggedInUser));
-      
-      // Fetch all users after logging in
       fetchUsers();
-    } catch (error)      {
+    } catch (error) {
       console.error('Login failed:', error);
     }
   };
@@ -65,35 +66,51 @@ function App() {
     }
   };
 
-  // Function to fetch messages for a given user
+  // Function to fetch all messages for a given user
   const fetchMessages = async (userId) => {
     try {
       const response = await axios.get(`${SERVER_URL}/messages?userId=${userId}`);
-      setMessages(response.data.reverse()); // Reverse to show oldest first
+      setMessages(response.data.reverse());
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+    }
+  };
+  
+  // --- NEW: Function to handle semantic search ---
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (searchQuery.trim() === '' || !user) return;
+
+    setIsSearching(true);
+    setSearchResults([]);
+    try {
+      const response = await axios.get(`${SERVER_URL}/semantic-search`, {
+        params: {
+          userId: user._id,
+          q: searchQuery,
+        },
+      });
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error('Failed to perform semantic search:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
   // Function to handle sending a message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || !user || !selectedUser) {
-      return; // Don't send if no message or no user selected
-    }
+    if (newMessage.trim() === '' || !user || !selectedUser) return;
 
     const messageData = {
       senderId: user._id,
-      receiverId: selectedUser._id, // Use the dynamically selected user's ID
+      receiverId: selectedUser._id,
       message: newMessage,
     };
 
     try {
-      // POST the message to the server to save it and emit it
       const response = await axios.post(`${SERVER_URL}/messages`, messageData);
-      
-      // The server will emit 'receiveMessage', which our useEffect will catch.
-      // We can also add it to our own state immediately for a snappier feel.
       setMessages((prevMessages) => [...prevMessages, response.data]);
       setNewMessage('');
     } catch (error) {
@@ -104,8 +121,7 @@ function App() {
   // Function to handle selecting a user from the list
   const handleUserSelect = (selected) => {
     setSelectedUser(selected);
-    fetchMessages(user._id); // Fetch all messages for the logged-in user
-    // A more advanced app would filter messages for just this conversation
+    fetchMessages(user._id);
   };
 
   // Render Login/Signup form if no user is logged in
@@ -114,20 +130,8 @@ function App() {
       <div className="login-container">
         <form onSubmit={handleLogin}>
           <h2>Chat App Login</h2>
-          <input
-            type="text"
-            placeholder="Your Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <input
-            type="email"
-            placeholder="Your Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          <input type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input type="email" placeholder="Your Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <button type="submit">Enter Chat</button>
         </form>
       </div>
@@ -138,28 +142,59 @@ function App() {
   return (
     <div className="app-container">
       <div className="users-list">
-        <h3>Users</h3>
-        {users
-          .filter((u) => u._id !== user._id) // Don't show the current user in the list
-          .map((u) => (
-            <div
-              key={u._id}
-              className={`user-item ${selectedUser?._id === u._id ? 'selected' : ''}`}
-              onClick={() => handleUserSelect(u)}
-            >
-              {u.name}
+        <h3>Users & Search</h3>
+        
+        {/* --- Search Form --- */}
+        <form className="search-form" onSubmit={handleSearch}>
+          <input
+            type="text"
+            placeholder="Search messages by meaning..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button type="submit" disabled={isSearching}>{isSearching ? '...' : 'Search'}</button>
+        </form>
+
+        {/* --- Search Results --- */}
+        <div className="search-results-container">
+          {isSearching && <p>Searching...</p>}
+          {searchResults.length > 0 && (
+            <div className="search-results">
+              <h4>Search Results</h4>
+              {searchResults.map((result, index) => (
+                <div key={index} className="result-item">
+                  <p className="result-text">"{result.message}"</p>
+                  <span className="result-meta">
+                    Score: {result.score.toFixed(3)} | {new Date(result.timestamp).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* --- User List --- */}
+        <div className="user-list-items">
+          {users
+            .filter((u) => u._id !== user._id)
+            .map((u) => (
+              <div
+                key={u._id}
+                className={`user-item ${selectedUser?._id === u._id ? 'selected' : ''}`}
+                onClick={() => handleUserSelect(u)}
+              >
+                {u.name}
+              </div>
+            ))}
+        </div>
       </div>
+
       <div className="chat-container">
         {selectedUser ? (
           <>
-            <div className="chat-header">
-              <h4>Chatting with {selectedUser.name}</h4>
-            </div>
+            <div className="chat-header"><h4>Chatting with {selectedUser.name}</h4></div>
             <div className="messages-list">
               {messages
-                // Filter messages for the current conversation
                 .filter(msg => 
                   (msg.senderId === user._id && msg.receiverId === selectedUser._id) || 
                   (msg.senderId === selectedUser._id && msg.receiverId === user._id)
@@ -171,19 +206,12 @@ function App() {
                 ))}
             </div>
             <form className="message-form" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-              />
+              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." />
               <button type="submit">Send</button>
             </form>
           </>
         ) : (
-          <div className="no-chat-selected">
-            <h3>Select a user from the list to start chatting</h3>
-          </div>
+          <div className="no-chat-selected"><h3>Select a user from the list to start chatting</h3></div>
         )}
       </div>
     </div>
