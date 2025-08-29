@@ -1,15 +1,188 @@
+/* General body and font styles */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f7f6;
+}
 
-body { font-family: sans-serif; }
+/* --- Login Page --- */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
 
-.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
-.login-container form { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 40px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
 
-.chat-container { display: flex; flex-direction: column; height: 100vh; max-width: 600px; margin: auto; border: 1px solid #eee; }
-.messages-list { flex-grow: 1; padding: 10px; overflow-y: auto; }
-.message { margin-bottom: 10px; padding: 8px 12px; border-radius: 18px; max-width: 70%; }
-.message.sent { background-color: #007bff; color: white; align-self: flex-end; }
-.message.received { background-color: #f1f0f0; color: black; align-self: flex-start; }
+.login-container h2 {
+  margin-top: 0;
+  text-align: center;
+}
 
-.message-form { display: flex; padding: 10px; border-top: 1px solid #eee; }
-.message-form input { flex-grow: 1; border: 1px solid #ccc; border-radius: 20px; padding: 10px; }
-.message-form button { margin-left: 10px; border: none; background: #007bff; color: white; padding: 10px 15px; border-radius: 20px; cursor: pointer; }
+.login-container input {
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.login-container button {
+  padding: 10px;
+  border: none;
+  background: #007bff;
+  color: white;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.login-container button:hover {
+  background: #0056b3;
+}
+
+
+/* --- Main App Layout --- */
+.app-container {
+  display: flex;
+  height: 100vh;
+  max-width: 1000px;
+  margin: auto;
+  background: white;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+
+/* --- User List / Sidebar --- */
+.users-list {
+  flex-basis: 250px; /* Set a fixed width for the sidebar */
+  flex-shrink: 0;
+  border-right: 1px solid #eee;
+  padding: 10px;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+}
+
+.users-list h3 {
+  margin-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.user-item {
+  padding: 12px;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  transition: background-color 0.2s;
+}
+
+.user-item:hover {
+  background-color: #e9e9e9;
+}
+
+.user-item.selected {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+}
+
+
+/* --- Chat Container --- */
+.chat-container {
+  flex-grow: 1; /* Allow the chat area to fill the remaining space */
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+  background-color: #f9f9f9;
+}
+
+.chat-header h4 {
+  margin: 0;
+}
+
+.no-chat-selected {
+  display: flex;
+  flex-grow: 1;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+
+
+/* --- Message Bubbles & Form (Existing) --- */
+.messages-list {
+  flex-grow: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-radius: 20px;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.message.sent {
+  background-color: #007bff;
+  color: white;
+  align-self: flex-end;
+}
+
+.message.received {
+  background-color: #e9e9e9;
+  color: black;
+  align-self: flex-start;
+}
+
+.message-form {
+  display: flex;
+  padding: 15px;
+  border-top: 1px solid #eee;
+  background-color: #f9f9f9;
+}
+
+.message-form input {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 10px 15px;
+  font-size: 1rem;
+}
+
+.message-form button {
+  margin-left: 10px;
+  border: none;
+  background: #007bff;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.message-form button:hover {
+  background: #0056b3;
+}
