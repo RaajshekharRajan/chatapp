@@ -13,8 +13,8 @@ const server = http.createServer(app);
 
 // --- CORS CONFIGURATION ---
 const allowedOrigins = [
-  'https://chatapp-1-j6a5.onrender.com/', // Your deployed frontend URL
-  'http://localhost:3000'                      // Your local development URL
+  'https://chatapp-1-j6a5.onrender.com',
+  'http://localhost:3000'                     
 ];
 const corsOptions = {
   origin: function (origin, callback) {
