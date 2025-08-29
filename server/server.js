@@ -98,6 +98,16 @@ app.get('/messages', async (req, res) => {
   }
 });
 
+// API to get all users
+app.get('/users', async (req, res) => {
+  try {
+    const users = await User.find({}); // Find all users
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 // --- Socket.IO Logic ---
 io.on('connection', (socket) => {
