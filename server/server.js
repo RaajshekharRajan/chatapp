@@ -5,31 +5,41 @@ const http = require('http');
 const mongoose = require('mongoose');
 const { Server } = require("socket.io");
 const cors = require('cors');
-const clientURL = 'https://chatapp-1-j6a5.onrender.com';
-
-// Update the cors options for both Express and Socket.IO
-const corsOptions = {
-  origin: [clientURL, "http://localhost:3000"]
-};
-
-app.use(cors(corsOptions));
-
-const io = new Server(server, {
-  cors: corsOptions
-});
 
 const app = express();
-app.use(cors()); // Allow cross-origin requests
-app.use(express.json()); // Middleware to parse JSON bodies
-
 const server = http.createServer(app);
 
-// Initialize Socket.IO and attach it to the HTTP server
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:3000", // Your React app's address
-    methods: ["GET", "POST"]
+// --- START OF CORS CONFIGURATION ---
+
+// 1. Define the URLs that are allowed to connect
+const allowedOrigins = [
+  'https://chatapp-1-j6a5.onrender.com/', // Your deployed frontend URL
+  'http://localhost:3000'                      // Your local development URL
+];
+
+// 2. Set up CORS options
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
   }
+};
+
+// 3. Use the CORS middleware for all Express routes
+app.use(cors(corsOptions));
+
+// --- END OF CORS CONFIGURATION ---
+
+app.use(express.json());
+
+// Initialize Socket.IO and attach it to the HTTP server with the same CORS options
+const io = new Server(server, {
+  cors: corsOptions
 });
 
 // Connect to MongoDB
@@ -37,39 +47,20 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB connected successfully.'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-
-// Socket.IO connection logic for real-time communication 
-io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-
-  // Listen for a new message from a client
-  socket.on('sendMessage', (messageData) => {
-    // Broadcast the message to the receiver
-    // In a real app, you would target a specific user's socket ID or room
-    socket.broadcast.emit('receiveMessage', messageData);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
-});
-
-const PORT = process.env.PORT || 5000;
-
+// Import models
 const User = require('./models/User');
 const Message = require('./models/Message');
 
-// API to create a user [cite: 11]
+// --- API Routes ---
+
+// API to create a user
 app.post('/users', async (req, res) => {
   try {
     const { name, email } = req.body;
-    // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
-      // For simplicity, if user exists, we'll just return them
       return res.status(200).json(user);
     }
-    // If not, create a new one
     user = new User({ name, email });
     await user.save();
     res.status(201).json(user);
@@ -78,26 +69,28 @@ app.post('/users', async (req, res) => {
   }
 });
 
-// API to send a message [cite: 12]
+// API to send a message
 app.post('/messages', async (req, res) => {
   try {
     const { senderId, receiverId, message } = req.body;
     const newMessage = new Message({ senderId, receiverId, message });
     await newMessage.save();
+    // Emit the message to the receiver in real-time
+    io.emit('receiveMessage', newMessage);
     res.status(201).json(newMessage);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// API to fetch recent chats for a user [cite: 13]
+// API to fetch recent chats for a user
 app.get('/messages', async (req, res) => {
   try {
-    const { userId, limit = 50 } = req.query; // Default limit to 50
+    const { userId, limit = 50 } = req.query;
     const messages = await Message.find({
       $or: [{ senderId: userId }, { receiverId: userId }]
     })
-    .sort({ createdAt: -1 }) // Get the most recent messages
+    .sort({ createdAt: -1 })
     .limit(parseInt(limit));
     res.status(200).json(messages);
   } catch (error) {
@@ -105,6 +98,20 @@ app.get('/messages', async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
-// --- We will add API routes below this line ---
+// --- Socket.IO Logic ---
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // Note: We are now emitting messages globally from the POST /messages route
+  // to ensure messages are saved before being sent.
+  // This simplifies the logic and guarantees persistence.
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
