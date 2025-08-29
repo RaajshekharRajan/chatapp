@@ -46,17 +46,21 @@ async function getEmbedding(text) {
   try {
     const response = await axios.post(
       'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
-      // The key is changed from "inputs" to "sentences" and the value is wrapped in an array
-      { sentences: [text] },
+      // Reverting to the 'inputs' key based on the latest error message
+      { inputs: text },
       { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
     );
 
-    // The API returns an array of embeddings, one for each sentence we sent.
-    // Since we only send one sentence, we take the first element.
-    const embedding = response.data[0];
+    // This logic handles different possible response shapes from the API.
+    // Sometimes it returns [[vector]], other times just [vector].
+    const embedding = Array.isArray(response.data) && Array.isArray(response.data[0])
+        ? response.data[0]
+        : response.data;
 
-    if (!embedding) {
-        throw new Error('Embedding not found in Hugging Face response.');
+    // Add a check to ensure the embedding is valid
+    if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+        console.error('Invalid embedding format received:', response.data);
+        throw new Error('Invalid embedding format from Hugging Face.');
     }
         
     return embedding;
