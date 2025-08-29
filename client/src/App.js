@@ -1,95 +1,99 @@
-// client/src/App.js
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
-import './App.css'; // We'll create this file for styling
+import './App.css';
 
-const socket = io('https://chatapp-mbgw.onrender.com'); // Your backend server address
+// ====================================================================================
+// IMPORTANT: Replace this with the URL of your deployed backend Web Service on Render
+const SERVER_URL = 'https://chatapp-mbgw.onrender.com';
+// ====================================================================================
+
+const socket = io(SERVER_URL);
 
 function App() {
+  // State for login and current user
   const [user, setUser] = useState(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+
+  // State for chat functionality
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null); // To store the selected chat partner
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get('https://your-backend-url.onrender.com/users');
-        setUsers(response.data);
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-      }
-    };
-    fetchUsers();
-  }, []);
   
-  // A simple placeholder for the other user. In a real app, you'd have a user list.
-  const receiverId = 'RECEIVER_USER_ID_PLACEHOLDER'; 
+  // New state for user list and selection
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
 
-  // Effect to handle incoming messages
+  // Effect to handle incoming messages in real-time
   useEffect(() => {
     socket.on('receiveMessage', (message) => {
-      // Make sure we don't add the message twice if we sent it
-      if (message.senderId !== user?._id) {
+      // Add message to state only if it's part of the selected conversation
+      if (selectedUser && (message.senderId === selectedUser._id || message.senderId === user._id)) {
         setMessages((prevMessages) => [...prevMessages, message]);
       }
     });
 
-    // Cleanup on component unmount
     return () => {
       socket.off('receiveMessage');
     };
-  }, [user]);
+  }, [selectedUser, user]);
 
-  // Function to handle user login/signup 
+
+  // Function to handle user login/signup
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('https://chatapp-mbgw.onrender.com/users', { name, email });
-      setUser(response.data);
-      localStorage.setItem('user', JSON.stringify(response.data)); // Persist user
-      fetchMessages(response.data._id);
-    } catch (error) {
+      const response = await axios.post(`${SERVER_URL}/users`, { name, email });
+      const loggedInUser = response.data;
+      setUser(loggedInUser);
+      localStorage.setItem('user', JSON.stringify(loggedInUser));
+      
+      // Fetch all users after logging in
+      fetchUsers();
+    } catch (error)      {
       console.error('Login failed:', error);
     }
   };
 
-  // Function to fetch initial messages
-  const fetchMessages = async (userId, partnerId) => {
-    // Fetches messages between the logged-in user and the selected partner
+  // Function to fetch all users from the server
+  const fetchUsers = async () => {
     try {
-      const response = await axios.get(`https://chatapp-mbgw.onrender.com/messages?userId=${userId}&limit=50`);
-      // This is a simple fetch; a more advanced version would filter by partnerId on the backend
-      setMessages(response.data.reverse());
+      const response = await axios.get(`${SERVER_URL}/users`);
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    }
+  };
+
+  // Function to fetch messages for a given user
+  const fetchMessages = async (userId) => {
+    try {
+      const response = await axios.get(`${SERVER_URL}/messages?userId=${userId}`);
+      setMessages(response.data.reverse()); // Reverse to show oldest first
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
   };
-  
 
   // Function to handle sending a message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || !user || !selectedUser) return;
+    if (newMessage.trim() === '' || !user || !selectedUser) {
+      return; // Don't send if no message or no user selected
+    }
 
     const messageData = {
       senderId: user._id,
-      receiverId: selectedUser._id, // Use the selected user's ID
+      receiverId: selectedUser._id, // Use the dynamically selected user's ID
       message: newMessage,
     };
 
     try {
-      // 1. Persist message to DB 
-      const response = await axios.post('https://chatapp-mbgw.onrender.com/messages', messageData);
+      // POST the message to the server to save it and emit it
+      const response = await axios.post(`${SERVER_URL}/messages`, messageData);
       
-      // 2. Send message via Socket.IO for real-time update 
-      socket.emit('sendMessage', response.data);
-
-      // 3. Update local state
+      // The server will emit 'receiveMessage', which our useEffect will catch.
+      // We can also add it to our own state immediately for a snappier feel.
       setMessages((prevMessages) => [...prevMessages, response.data]);
       setNewMessage('');
     } catch (error) {
@@ -97,12 +101,19 @@ function App() {
     }
   };
 
-  // Login/Signup form
+  // Function to handle selecting a user from the list
+  const handleUserSelect = (selected) => {
+    setSelectedUser(selected);
+    fetchMessages(user._id); // Fetch all messages for the logged-in user
+    // A more advanced app would filter messages for just this conversation
+  };
+
+  // Render Login/Signup form if no user is logged in
   if (!user) {
     return (
       <div className="login-container">
         <form onSubmit={handleLogin}>
-          <h2>Login / Signup</h2>
+          <h2>Chat App Login</h2>
           <input
             type="text"
             placeholder="Your Name"
@@ -123,20 +134,22 @@ function App() {
     );
   }
 
-  // Chat UI
+  // Render the main chat interface if logged in
   return (
     <div className="app-container">
       <div className="users-list">
         <h3>Users</h3>
-        {users.filter(u => u._id !== user._id).map((u) => ( // Filter out the current user from the list
-          <div 
-            key={u._id} 
-            className={`user-item ${selectedUser?._id === u._id ? 'selected' : ''}`}
-            onClick={() => handleUserSelect(u)}
-          >
-            {u.name}
-          </div>
-        ))}
+        {users
+          .filter((u) => u._id !== user._id) // Don't show the current user in the list
+          .map((u) => (
+            <div
+              key={u._id}
+              className={`user-item ${selectedUser?._id === u._id ? 'selected' : ''}`}
+              onClick={() => handleUserSelect(u)}
+            >
+              {u.name}
+            </div>
+          ))}
       </div>
       <div className="chat-container">
         {selectedUser ? (
@@ -145,11 +158,17 @@ function App() {
               <h4>Chatting with {selectedUser.name}</h4>
             </div>
             <div className="messages-list">
-              {messages.map((msg, index) => (
-                <div key={index} className={`message ${msg.senderId === user._id ? 'sent' : 'received'}`}>
-                  <p>{msg.message}</p>
-                </div>
-              ))}
+              {messages
+                // Filter messages for the current conversation
+                .filter(msg => 
+                  (msg.senderId === user._id && msg.receiverId === selectedUser._id) || 
+                  (msg.senderId === selectedUser._id && msg.receiverId === user._id)
+                )
+                .map((msg, index) => (
+                  <div key={index} className={`message ${msg.senderId === user._id ? 'sent' : 'received'}`}>
+                    <p>{msg.message}</p>
+                  </div>
+                ))}
             </div>
             <form className="message-form" onSubmit={handleSendMessage}>
               <input
@@ -163,7 +182,7 @@ function App() {
           </>
         ) : (
           <div className="no-chat-selected">
-            <h3>Select a user to start chatting</h3>
+            <h3>Select a user from the list to start chatting</h3>
           </div>
         )}
       </div>
