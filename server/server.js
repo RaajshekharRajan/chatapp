@@ -45,7 +45,7 @@ const qdrantClient = new QdrantClient({
 async function getEmbedding(text) {
   try {
     const response = await axios.post(
-      'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
+      'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
       { inputs: text },
       { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
     );
