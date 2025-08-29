@@ -13,7 +13,7 @@ const server = http.createServer(app);
 
 // 1. Define the URLs that are allowed to connect
 const allowedOrigins = [
-  'https://chatapp-1-j6a5.onrender.com/', // Your deployed frontend URL
+  'https://chatapp-1-j6a5.onrender.com', // Your deployed frontend URL
   'http://localhost:3000'                      // Your local development URL
 ];
 
