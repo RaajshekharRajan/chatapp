@@ -42,16 +42,27 @@ const qdrantClient = new QdrantClient({
 
 // --- HELPER FUNCTIONS ---
 // Helper function to get embeddings from Hugging Face
+// Helper function to get embeddings from Hugging Face
 async function getEmbedding(text) {
   try {
+    // The main change is in this URL
     const response = await axios.post(
       'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
       { inputs: text },
       { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
     );
 
-    // Hugging Face returns a 2D array [[...vector...]], flatten it
-    const embedding = Array.isArray(response.data[0]) ? response.data[0] : response.data;
+    // Hugging Face may return a 2D array [[...vector...]], flatten it
+    // Note: The new endpoint might have a slightly different response structure.
+    // This check is still good to have.
+    const embedding = Array.isArray(response.data) && Array.isArray(response.data[0]) 
+        ? response.data[0] 
+        : response.data;
+
+    if (!embedding) {
+        throw new Error('Embedding not found in Hugging Face response.');
+    }
+        
     return embedding;
   } catch (error) {
     console.error(
