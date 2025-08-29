@@ -35,6 +35,55 @@ app.use(cors(corsOptions));
 
 // --- END OF CORS CONFIGURATION ---
 
+app.get('/semantic-search', async (req, res) => {
+  try {
+    const { userId, q } = req.query; // q is the search query
+
+    if (!q || !userId) {
+      return res.status(400).json({ error: 'Search query (q) and userId are required.' });
+    }
+
+    // 1. Convert the search query into a vector
+    const queryVector = await getEmbedding(q);
+
+    // 2. Use the vector to search in Qdrant
+    const searchResult = await qdrantClient.search('messages', {
+      vector: queryVector,
+      limit: 10, // Get the top 10 results
+      filter: {
+        // Only search messages relevant to the current user
+        should: [
+          {
+            key: 'senderId',
+            match: {
+              value: userId,
+            },
+          },
+          {
+            key: 'receiverId',
+            match: {
+              value: userId,
+            },
+          },
+        ],
+      },
+    });
+
+    // 3. Format the results to match the assignment's requirements
+    const formattedResults = searchResult.map((result) => ({
+      message: result.payload.text,
+      score: result.score,
+      timestamp: result.payload.timestamp,
+    }));
+
+    res.status(200).json(formattedResults);
+
+  } catch (error) {
+    console.error('Error in /semantic-search:', error);
+    res.status(500).json({ error: 'Server error during semantic search.' });
+  }
+});
+
 app.use(express.json());
 
 // Initialize Socket.IO and attach it to the HTTP server with the same CORS options
