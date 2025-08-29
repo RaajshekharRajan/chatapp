@@ -1,5 +1,5 @@
 // client/src/App.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
 import './App.css'; // We'll create this file for styling
@@ -12,6 +12,20 @@ function App() {
   const [newMessage, setNewMessage] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null); // To store the selected chat partner
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await axios.get('https://your-backend-url.onrender.com/users');
+        setUsers(response.data);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+  }, []);
   
   // A simple placeholder for the other user. In a real app, you'd have a user list.
   const receiverId = 'RECEIVER_USER_ID_PLACEHOLDER'; 
@@ -45,23 +59,26 @@ function App() {
   };
 
   // Function to fetch initial messages
-  const fetchMessages = async (userId) => {
+  const fetchMessages = async (userId, partnerId) => {
+    // Fetches messages between the logged-in user and the selected partner
     try {
       const response = await axios.get(`https://chatapp-mbgw.onrender.com/messages?userId=${userId}&limit=50`);
-      setMessages(response.data.reverse()); // Reverse to show oldest first
+      // This is a simple fetch; a more advanced version would filter by partnerId on the backend
+      setMessages(response.data.reverse());
     } catch (error) {
       console.error('Failed to fetch messages:', error);
     }
   };
+  
 
   // Function to handle sending a message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || !user) return;
+    if (newMessage.trim() === '' || !user || !selectedUser) return;
 
     const messageData = {
       senderId: user._id,
-      receiverId: receiverId, // NOTE: This needs to be dynamic in a real app
+      receiverId: selectedUser._id, // Use the selected user's ID
       message: newMessage,
     };
 
@@ -108,23 +125,48 @@ function App() {
 
   // Chat UI
   return (
-    <div className="chat-container">
-      <div className="messages-list">
-        {messages.map((msg, index) => (
-          <div key={index} className={`message ${msg.senderId === user._id ? 'sent' : 'received'}`}>
-            <p>{msg.message}</p>
+    <div className="app-container">
+      <div className="users-list">
+        <h3>Users</h3>
+        {users.filter(u => u._id !== user._id).map((u) => ( // Filter out the current user from the list
+          <div 
+            key={u._id} 
+            className={`user-item ${selectedUser?._id === u._id ? 'selected' : ''}`}
+            onClick={() => handleUserSelect(u)}
+          >
+            {u.name}
           </div>
         ))}
       </div>
-      <form className="message-form" onSubmit={handleSendMessage}>
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
-        />
-        <button type="submit">Send</button>
-      </form>
+      <div className="chat-container">
+        {selectedUser ? (
+          <>
+            <div className="chat-header">
+              <h4>Chatting with {selectedUser.name}</h4>
+            </div>
+            <div className="messages-list">
+              {messages.map((msg, index) => (
+                <div key={index} className={`message ${msg.senderId === user._id ? 'sent' : 'received'}`}>
+                  <p>{msg.message}</p>
+                </div>
+              ))}
+            </div>
+            <form className="message-form" onSubmit={handleSendMessage}>
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+              />
+              <button type="submit">Send</button>
+            </form>
+          </>
+        ) : (
+          <div className="no-chat-selected">
+            <h3>Select a user to start chatting</h3>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
