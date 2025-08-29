@@ -35,7 +35,7 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('hhttps://chatapp-mbgw.onrender.com/users', { name, email });
+      const response = await axios.post('https://chatapp-mbgw.onrender.com/users', { name, email });
       setUser(response.data);
       localStorage.setItem('user', JSON.stringify(response.data)); // Persist user
       fetchMessages(response.data._id);
