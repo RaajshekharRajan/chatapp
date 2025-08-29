@@ -30,14 +30,11 @@ function App() {
   // Effect to handle incoming messages in real-time
   useEffect(() => {
     socket.on('receiveMessage', (message) => {
-      // *** FIX FOR DUPLICATE MESSAGES ***
-      // If the incoming message was sent by the current user, do nothing.
-      // The optimistic update in handleSendMessage already added it to the UI.
+      // FIX FOR DUPLICATE MESSAGES
       if (message.senderId === user?._id) {
         return;
       }
 
-      // Only add the message to the state if it's part of the currently active conversation
       if (selectedUser && (message.senderId === selectedUser._id || message.receiverId === selectedUser._id)) {
         setMessages((prevMessages) => [...prevMessages, message]);
       }
@@ -105,32 +102,35 @@ function App() {
     }
   };
 
-  // Function to handle sending a message
+  // --- CORRECTED Function to handle sending a message ---
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (newMessage.trim() === '' || !user || !selectedUser) return;
-
+  
     const messageData = {
       senderId: user._id,
       receiverId: selectedUser._id,
       message: newMessage,
     };
 
+    // Create the temporary message before the try...catch block
+    const tempMessage = { ...messageData, _id: Date.now().toString(), createdAt: new Date().toISOString() };
+  
+    // Optimistically add the message to the UI immediately
+    setMessages((prevMessages) => [...prevMessages, tempMessage]);
+    setNewMessage('');
+  
     try {
-      // Optimistically add the message to our own UI first
-      const tempMessage = { ...messageData, _id: Date.now().toString(), createdAt: new Date().toISOString() };
-      setMessages((prevMessages) => [...prevMessages, tempMessage]);
-      setNewMessage('');
-
-      // Then, send it to the server to be saved and broadcast to the other user
+      // Send the original data (without the temporary ID) to the server
       await axios.post(`${SERVER_URL}/messages`, messageData);
-      
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Optional: Remove the message from state if the API call fails
+      // If the API call fails, the catch block can now see tempMessage
+      // and will remove the optimistic message from the UI.
       setMessages((prevMessages) => prevMessages.filter(m => m._id !== tempMessage._id));
     }
   };
+
 
   // Function to handle selecting a user from the list
   const handleUserSelect = (selected) => {
