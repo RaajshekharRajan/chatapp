@@ -41,38 +41,49 @@ const qdrantClient = new QdrantClient({
 });
 
 // --- HELPER FUNCTIONS ---
-// Helper function to get embeddings from Hugging Face
+// A more robust helper function to get embeddings from Hugging Face with retries
 async function getEmbedding(text) {
-  try {
-    const response = await axios.post(
-      'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
-      // Reverting to the 'inputs' key based on the latest error message
-      { inputs: text },
-      { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
-    );
+  const maxRetries = 3;
+  const delay = 2000; // 2 seconds delay between retries
 
-    // This logic handles different possible response shapes from the API.
-    // Sometimes it returns [[vector]], other times just [vector].
-    const embedding = Array.isArray(response.data) && Array.isArray(response.data[0])
-        ? response.data[0]
-        : response.data;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await axios.post(
+        'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
+        { inputs: text },
+        { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
+      );
 
-    // Add a check to ensure the embedding is valid
-    if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
-        console.error('Invalid embedding format received:', response.data);
-        throw new Error('Invalid embedding format from Hugging Face.');
+      const embedding = Array.isArray(response.data) && Array.isArray(response.data[0])
+          ? response.data[0]
+          : response.data;
+
+      if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
+          throw new Error('Invalid embedding format from Hugging Face.');
+      }
+      
+      return embedding; // Success! Return the embedding.
+
+    } catch (error) {
+      const statusCode = error.response ? error.response.status : null;
+      const errorMessage = error.response ? error.response.data : error.message;
+
+      console.error(
+        `Attempt ${i + 1} failed with status ${statusCode}:`,
+        errorMessage
+      );
+      
+      // If the model is loading (503) and we have retries left, wait and try again.
+      if (statusCode === 503 && i < maxRetries - 1) {
+        console.log(`Model is loading. Retrying in ${delay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        // For any other error, or if we're out of retries, throw the final error.
+        throw new Error('Failed to generate embedding after multiple attempts.');
+      }
     }
-        
-    return embedding;
-  } catch (error) {
-    console.error(
-      'Error getting embedding from Hugging Face:',
-      error.response ? error.response.data : error.message
-    );
-    throw new Error('Failed to generate embedding.');
   }
 }
-
 // --- MODEL IMPORTS ---
 const User = require('./models/User');
 const Message = require('./models/Message');
