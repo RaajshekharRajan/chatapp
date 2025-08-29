@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import './App.css';
 
-const SERVER_URL = 'https://your-backend-url.onrender.com';
+const SERVER_URL = 'https://chatapp-mbgw.onrender.com';
 
 
 const socket = io(SERVER_URL);
