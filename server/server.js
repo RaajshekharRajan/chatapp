@@ -45,11 +45,13 @@ const qdrantClient = new QdrantClient({
 async function getEmbedding(text) {
   try {
     const response = await axios.post(
-      'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
+      // --- FIX: Using the correct '/models/' endpoint ---
+      'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
       { inputs: text, options: { wait_for_model: true } },
       { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
     );
-    return response.data;
+    // The embedding is often nested in the response, handle both cases
+    return Array.isArray(response.data) ? response.data[0] : response.data;
   } catch (error) {
     console.error('Error getting embedding from Hugging Face:', error.response ? error.response.data : error.message);
     throw new Error('Failed to generate embedding.');
