@@ -5,6 +5,18 @@ const http = require('http');
 const mongoose = require('mongoose');
 const { Server } = require("socket.io");
 const cors = require('cors');
+const clientURL = 'https://chatapp-1-j6a5.onrender.com';
+
+// Update the cors options for both Express and Socket.IO
+const corsOptions = {
+  origin: [clientURL, "http://localhost:3000"]
+};
+
+app.use(cors(corsOptions));
+
+const io = new Server(server, {
+  cors: corsOptions
+});
 
 const app = express();
 app.use(cors()); // Allow cross-origin requests
