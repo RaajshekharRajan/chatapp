@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import './App.css'; // We'll create this file for styling
 
-const socket = io('http://localhost:5000'); // Your backend server address
+const socket = io('https://chatapp-mbgw.onrender.com'); // Your backend server address
 
 function App() {
   const [user, setUser] = useState(null);
@@ -35,7 +35,7 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/users', { name, email });
+      const response = await axios.post('hhttps://chatapp-mbgw.onrender.com/users', { name, email });
       setUser(response.data);
       localStorage.setItem('user', JSON.stringify(response.data)); // Persist user
       fetchMessages(response.data._id);
@@ -47,7 +47,7 @@ function App() {
   // Function to fetch initial messages
   const fetchMessages = async (userId) => {
     try {
-      const response = await axios.get(`http://localhost:5000/messages?userId=${userId}&limit=50`);
+      const response = await axios.get(`https://chatapp-mbgw.onrender.com/messages?userId=${userId}&limit=50`);
       setMessages(response.data.reverse()); // Reverse to show oldest first
     } catch (error) {
       console.error('Failed to fetch messages:', error);
@@ -67,7 +67,7 @@ function App() {
 
     try {
       // 1. Persist message to DB 
-      const response = await axios.post('http://localhost:5000/messages', messageData);
+      const response = await axios.post('https://chatapp-mbgw.onrender.com/messages', messageData);
       
       // 2. Send message via Socket.IO for real-time update 
       socket.emit('sendMessage', response.data);
