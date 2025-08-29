@@ -5,7 +5,6 @@ import './App.css';
 
 const SERVER_URL = 'https://chatapp-mbgw.onrender.com';
 
-
 const socket = io(SERVER_URL);
 
 function App() {
@@ -22,7 +21,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // --- NEW: State for semantic search ---
+  // State for semantic search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -30,12 +29,15 @@ function App() {
 
   // Effect to handle incoming messages in real-time
   useEffect(() => {
-
-    if (message.senderId === user?._id) {
-      return;
-    }
-    
     socket.on('receiveMessage', (message) => {
+      // *** FIX FOR DUPLICATE MESSAGES ***
+      // If the incoming message was sent by the current user, do nothing.
+      // The optimistic update in handleSendMessage already added it to the UI.
+      if (message.senderId === user?._id) {
+        return;
+      }
+
+      // Only add the message to the state if it's part of the currently active conversation
       if (selectedUser && (message.senderId === selectedUser._id || message.receiverId === selectedUser._id)) {
         setMessages((prevMessages) => [...prevMessages, message]);
       }
@@ -81,7 +83,7 @@ function App() {
     }
   };
   
-  // --- NEW: Function to handle semantic search ---
+  // Function to handle semantic search
   const handleSearch = async (e) => {
     e.preventDefault();
     if (searchQuery.trim() === '' || !user) return;
@@ -115,11 +117,18 @@ function App() {
     };
 
     try {
-      const response = await axios.post(`${SERVER_URL}/messages`, messageData);
-      setMessages((prevMessages) => [...prevMessages, response.data]);
+      // Optimistically add the message to our own UI first
+      const tempMessage = { ...messageData, _id: Date.now().toString(), createdAt: new Date().toISOString() };
+      setMessages((prevMessages) => [...prevMessages, tempMessage]);
       setNewMessage('');
+
+      // Then, send it to the server to be saved and broadcast to the other user
+      await axios.post(`${SERVER_URL}/messages`, messageData);
+      
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Optional: Remove the message from state if the API call fails
+      setMessages((prevMessages) => prevMessages.filter(m => m._id !== tempMessage._id));
     }
   };
 
@@ -149,7 +158,6 @@ function App() {
       <div className="users-list">
         <h3>Users & Search</h3>
         
-        {/* --- Search Form --- */}
         <form className="search-form" onSubmit={handleSearch}>
           <input
             type="text"
@@ -160,7 +168,6 @@ function App() {
           <button type="submit" disabled={isSearching}>{isSearching ? '...' : 'Search'}</button>
         </form>
 
-        {/* --- Search Results --- */}
         <div className="search-results-container">
           {isSearching && <p>Searching...</p>}
           {searchResults.length > 0 && (
@@ -178,7 +185,6 @@ function App() {
           )}
         </div>
 
-        {/* --- User List --- */}
         <div className="user-list-items">
           {users
             .filter((u) => u._id !== user._id)
