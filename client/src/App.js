@@ -30,6 +30,11 @@ function App() {
 
   // Effect to handle incoming messages in real-time
   useEffect(() => {
+
+    if (message.senderId === user?._id) {
+      return;
+    }
+    
     socket.on('receiveMessage', (message) => {
       if (selectedUser && (message.senderId === selectedUser._id || message.receiverId === selectedUser._id)) {
         setMessages((prevMessages) => [...prevMessages, message]);
