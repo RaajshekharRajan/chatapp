@@ -41,28 +41,29 @@ const qdrantClient = new QdrantClient({
 });
 
 // --- HELPER FUNCTIONS ---
-// A more robust helper function to get embeddings from Hugging Face with retries
+
+// Definitive function combining retry logic with the correct payload format
 async function getEmbedding(text) {
   const maxRetries = 3;
-  const delay = 2000; // 2 seconds delay between retries
+  const delay = 3000; // Increased delay to 3 seconds
 
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await axios.post(
         'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2',
-        { inputs: text },
+        // The payload is now { sentences: [text] }
+        { sentences: [text] },
         { headers: { Authorization: `Bearer ${process.env.HF_TOKEN}` } }
       );
 
-      const embedding = Array.isArray(response.data) && Array.isArray(response.data[0])
-          ? response.data[0]
-          : response.data;
+      // The API returns an array of embeddings, so we take the first one
+      const embedding = response.data[0];
 
       if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
           throw new Error('Invalid embedding format from Hugging Face.');
       }
       
-      return embedding; // Success! Return the embedding.
+      return embedding; // Success!
 
     } catch (error) {
       const statusCode = error.response ? error.response.status : null;
@@ -70,20 +71,19 @@ async function getEmbedding(text) {
 
       console.error(
         `Attempt ${i + 1} failed with status ${statusCode}:`,
-        errorMessage
+        JSON.stringify(errorMessage)
       );
       
-      // If the model is loading (503) and we have retries left, wait and try again.
-      if (statusCode === 503 && i < maxRetries - 1) {
-        console.log(`Model is loading. Retrying in ${delay / 1000} seconds...`);
+      if (i < maxRetries - 1) {
+        console.log(`Retrying in ${delay / 1000} seconds...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        // For any other error, or if we're out of retries, throw the final error.
         throw new Error('Failed to generate embedding after multiple attempts.');
       }
     }
   }
 }
+
 // --- MODEL IMPORTS ---
 const User = require('./models/User');
 const Message = require('./models/Message');
