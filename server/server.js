@@ -4,7 +4,7 @@ const http = require('http');
 const mongoose = require('mongoose');
 const { Server } = require("socket.io");
 const cors = require('cors');
-const { QdrantClient } = require('@qdrant/js-client');
+const { QdrantClient } = require('@qdrant/js-client-rest');
 const axios = require('axios');
 
 // --- INITIALIZATIONS ---
